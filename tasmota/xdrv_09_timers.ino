@@ -515,15 +515,16 @@ void CmndShuffleWeekDays(void)
     DEBUG_DRIVER_LOG(PSTR("CmndShuffleWeekDays: i=%d j=%d"), i, j);
     if (i != j) {
       DEBUG_DRIVER_LOG(PSTR("CmndShuffleWeekDays: swapping day %d with %d"), d[i], d[j]);
+      uint8_t day_a = (1<<d[i]);
+      uint8_t day_b = (1<<d[j]);
+      uint8_t keep  = 0x7F - day_a - day_b;
       for (uint32_t t = 0; t < MAX_TIMERS; t++) { // apply swap to all selected timers
         if (timermask & (1<<t)) {
           Timer xtimer = Settings->timer[t];
           DEBUG_DRIVER_LOG(PSTR("CmndShuffleWeekDays: timer[%d].days was %x"), t, xtimer.days);
-          uint8_t day_a = (1<<d[i]);    // bitmask for day-a to swap
-          uint8_t day_b = (1<<d[j]);    // bitmask for day-b to swap
-          xtimer.days = ( xtimer.days & (0x7F - day_a - day_b))     // keep all days except day-a and day-b
-                      | (xtimer.days & day_a ? day_b : 0)       // this is flag for day-a shifted to day-b
-                      | (xtimer.days & day_b ? day_a : 0);      // this is flag for day-b shifted to day-a
+          xtimer.days = (xtimer.days & keep             )
+                      | (xtimer.days & day_a ? day_b : 0)
+                      | (xtimer.days & day_b ? day_a : 0);
           DEBUG_DRIVER_LOG(PSTR("CmndShuffleWeekDays: timer[%d].days changed to %x"), t, xtimer.days);
         }        
       }
