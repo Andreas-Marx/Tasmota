@@ -522,8 +522,8 @@ void CmndShuffleWeekDays(void)
           uint8_t day_a = (1<<d[i]);    // bitmask for day-a to swap
           uint8_t day_b = (1<<d[j]);    // bitmask for day-b to swap
           xtimer.days = ( xtimer.days & (0x7F - day_a - day_b))     // keep all days except day-a and day-b
-                      | ((xtimer.days & day_a ? 1 : 0)<<d[j])       // this is flag for day-a shifted to day-b
-                      | ((xtimer.days & day_b ? 1 : 0)<<d[i]);      // this is flag for day-b shifted to day-a
+                      | (xtimer.days & day_a ? day_b : 0)       // this is flag for day-a shifted to day-b
+                      | (xtimer.days & day_b ? day_a : 0);      // this is flag for day-b shifted to day-a
           DEBUG_DRIVER_LOG(PSTR("CmndShuffleWeekDays: timer[%d].days changed to %x"), t, xtimer.days);
         }        
       }
