@@ -46,7 +46,7 @@ const char kTimerCommands[] PROGMEM = "|"  // No prefix
   ;
 
 void (* const TimerCommand[])(void) PROGMEM = {
-  &CmndTimer, &CmndTimers
+  &CmndTimer, &CmndTimers, &CmndShuffleWeekDays
 #ifdef USE_SUNRISE
   , &CmndLatitude, &CmndLongitude
 #endif
@@ -489,6 +489,41 @@ void CmndTimers(void)
   }
   ResponseClear();
 #endif
+}
+
+void CmndShuffleWeekDays(void) 
+{
+  uint32_t timermask; // bitmask of timers to shuffle
+  uint8_t  daymask;   // bitmask of weekdays to shuffle
+
+  // TODO: parameter parsing
+  timermask = 0xF;  // shuffle timers 1-4
+  daymask   = 0x35; // shuffle Su, Tu, Th, Fr
+
+  uint8_t d[7];  // weekday indexing array
+  uint8_t n = 0; // number of weekdays to shuffle
+
+  for (uint8_t i=0;i<7;i++) {
+    if (daymask & (1<<i)) {
+      d[n++] = i;
+    }
+  }
+
+  for (uint8_t i=n-1;i;i--) { // Durstenfeld shuffle algorithm
+    uint8_t j=random(0,i);
+    if (i != j) {
+      for (uint32_t t = 0; t < MAX_TIMERS; t++) { // apply swap to all selected timers
+        if (timermask & (1<<t)) {
+          Timer xtimer = Settings->timer[t];
+          uint8_t day_a = (1<<d[i]);    // bitmask for day-a to swap
+          uint8_t day_b = (1<<d[j]);    // bitmask for day-b to swap
+          xtimer.days = ( xtimer.days & (0x7F - day_a - day_b))     // keep all days except day-a and day-b
+                      | ((xtimer.days & day_a ? 1 : 0)<<d[j])       // this is flag for day-a shifted to day-b
+                      | ((xtimer.days & day_b ? 1 : 0)<<d[i]);      // this is flag for day-b shifted to day-a
+        }        
+      }
+    }
+  }
 }
 
 #ifdef USE_SUNRISE
