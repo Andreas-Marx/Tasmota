@@ -505,21 +505,26 @@ void CmndShuffleWeekDays(void)
 
   for (uint8_t i=0;i<7;i++) {
     if (daymask & (1<<i)) {
+      DEBUG_DRIVER_LOG(PSTR("CmndShuffleWeekDays: d[%d] = %d"), n, i);
       d[n++] = i;
     }
   }
 
   for (uint8_t i=n-1;i;i--) { // Durstenfeld shuffle algorithm
     uint8_t j=random(0,i);
+    DEBUG_DRIVER_LOG(PSTR("CmndShuffleWeekDays: i=%d j=%d"), i, j);
     if (i != j) {
+      DEBUG_DRIVER_LOG(PSTR("CmndShuffleWeekDays: swapping day %d with %d"), d[i], d[j]);
       for (uint32_t t = 0; t < MAX_TIMERS; t++) { // apply swap to all selected timers
         if (timermask & (1<<t)) {
           Timer xtimer = Settings->timer[t];
+          DEBUG_DRIVER_LOG(PSTR("CmndShuffleWeekDays: timer[%d].days was %x"), t, xtimer.days);
           uint8_t day_a = (1<<d[i]);    // bitmask for day-a to swap
           uint8_t day_b = (1<<d[j]);    // bitmask for day-b to swap
           xtimer.days = ( xtimer.days & (0x7F - day_a - day_b))     // keep all days except day-a and day-b
                       | ((xtimer.days & day_a ? 1 : 0)<<d[j])       // this is flag for day-a shifted to day-b
                       | ((xtimer.days & day_b ? 1 : 0)<<d[i]);      // this is flag for day-b shifted to day-a
+          DEBUG_DRIVER_LOG(PSTR("CmndShuffleWeekDays: timer[%d].days changed to %x"), t, xtimer.days);
         }        
       }
     }
