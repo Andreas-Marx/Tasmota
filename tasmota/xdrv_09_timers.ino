@@ -517,15 +517,22 @@ void CmndShuffleWeekDays(void)
     DEBUG_DRIVER_LOG(PSTR("CmndShuffleWeekDays: i=%d j=%d"), i, j);
     if (i != j) {
       DEBUG_DRIVER_LOG(PSTR("CmndShuffleWeekDays: swapping day %d with %d"), d[i], d[j]);
-      uint8_t day_a = (1<<d[i]);
-      uint8_t day_b = (1<<d[j]);
-      uint8_t keep  = 0x7F - day_a - day_b;
+      uint8_t day_a  = (1<<d[i]), p_day_a = (1<<((d[i]+6)%7);
+      uint8_t day_b  = (1<<d[j]), p_day_b = (1<<((d[i]+6)%7);
+      uint8_t keep   = 0x7F -   day_a -   day_b,
+              p_keep = 0x7F - p_day_a - p_day_b;
       for (uint32_t t = 0; t < MAX_TIMERS; t++) { // apply swap to all selected timers
         if (timermask & (1<<t)) {
           DEBUG_DRIVER_LOG(PSTR("CmndShuffleWeekDays: timer[%d].days was        0x%x"), t, Settings->timer[t].days);
-          Settings->timer[t].days = ((Settings->timer[t].days) & keep             )
-                                  | ((Settings->timer[t].days) & day_a ? day_b : 0)
-                                  | ((Settings->timer[t].days) & day_b ? day_a : 0);
+          if (Settings->timer[t].mode == 3) {
+            Settings->timer[t].days = ((Settings->timer[t].days) & p_keep               )
+                                    | ((Settings->timer[t].days) & p_day_a ? p_day_b : 0)
+                                    | ((Settings->timer[t].days) & p_day_b ? p_day_a : 0);
+          } else {
+            Settings->timer[t].days = ((Settings->timer[t].days) &   keep               )
+                                    | ((Settings->timer[t].days) &   day_a ?   day_b : 0)
+                                    | ((Settings->timer[t].days) &   day_b ?   day_a : 0);
+          }
           DEBUG_DRIVER_LOG(PSTR("CmndShuffleWeekDays: timer[%d].days changed to 0x%x"), t, Settings->timer[t].days);
         }        
       }
@@ -612,7 +619,7 @@ const char HTTP_TIMER_SCRIPT2[] PROGMEM =
     "var m,p,q;"
     "m=qs('input[name=\"rd\"]:checked').value;"                   // Get mode
     "p=pt[ct]&0x7FF;"                                             // Get time
-    "if(m==0){"                                                   // Time is set
+    "if(m==0||m==3){"                                             // Time is set
       "so(0);"                                                    // Hide offset span and allow Hour 00..23
       "q=Math.floor(p/60);if(q<10){q='0'+q;}qs('#ho').value=q;"   // Set hours
       "q=p%%60;if(q<10){q='0'+q;}qs('#mi').value=q;"               // Set minutes
@@ -857,6 +864,7 @@ const char HTTP_FORM_TIMER3[] PROGMEM =
   "<label><input id='b0' name='rd' type='radio' value='0' onclick='gt();'><b>" D_TIMER_TIME "</b></label><br>"
   "<label><input id='b1' name='rd' type='radio' value='1' onclick='gt();'><b>" D_SUNRISE "</b> (%s)</label><br>"
   "<label><input id='b2' name='rd' type='radio' value='2' onclick='gt();'><b>" D_SUNSET "</b> (%s)</label><br>"
+  "<label><input id='b3' name='rd' type='radio' value='3' onclick='gt();'><b>" D_PREVIOUS "</b> (%s)</label><br>"
   "</fieldset>"
   "<p></p>"
   "<span><select style='width:46px;' id='dr'></select></span>"
