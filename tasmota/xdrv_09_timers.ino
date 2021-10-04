@@ -39,14 +39,16 @@
 #define XDRV_09             9
 
 const char kTimerCommands[] PROGMEM = "|"  // No prefix
-  D_CMND_TIMER "|" D_CMND_TIMERS "|" D_CMND_SHUFFLEWEEEKDAYS
+  D_CMND_TIMER "|" D_CMND_TIMERS 
+  "|" D_CMND_SHUFFLEWEEEKDAYS
 #ifdef USE_SUNRISE
   "|" D_CMND_LATITUDE "|" D_CMND_LONGITUDE 
 #endif
   ;
 
 void (* const TimerCommand[])(void) PROGMEM = {
-  &CmndTimer, &CmndTimers, &CmndShuffleWeekDays
+  &CmndTimer, &CmndTimers
+, &CmndShuffleWeekDays
 #ifdef USE_SUNRISE
   , &CmndLatitude, &CmndLongitude
 #endif
@@ -530,6 +532,7 @@ void CmndShuffleWeekDays(void)
       }
     }
   }
+  Response_P(PSTR("{\"" D_CMND_SHUFFLEWEEEKDAYS "\":\"OK\"}"));
 }
 
 #ifdef USE_SUNRISE
