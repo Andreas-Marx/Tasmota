@@ -522,12 +522,11 @@ void CmndShuffleWeekDays(void)
       uint8_t keep  = 0x7F - day_a - day_b;
       for (uint32_t t = 0; t < MAX_TIMERS; t++) { // apply swap to all selected timers
         if (timermask & (1<<t)) {
-          Timer xtimer = Settings->timer[t];
-          DEBUG_DRIVER_LOG(PSTR("CmndShuffleWeekDays: timer[%d].days was %x"), t, xtimer.days);
-          xtimer.days = (xtimer.days & keep             )
-                      | (xtimer.days & day_a ? day_b : 0)
-                      | (xtimer.days & day_b ? day_a : 0);
-          DEBUG_DRIVER_LOG(PSTR("CmndShuffleWeekDays: timer[%d].days changed to %x"), t, xtimer.days);
+          DEBUG_DRIVER_LOG(PSTR("CmndShuffleWeekDays: timer[%d].days was        0x%x"), t, xtimer.days);
+          xtimer.days = ((Settings->timer[t]) & keep             )
+                      | ((Settings->timer[t]) & day_a ? day_b : 0)
+                      | ((Settings->timer[t]) & day_b ? day_a : 0);
+          DEBUG_DRIVER_LOG(PSTR("CmndShuffleWeekDays: timer[%d].days changed to 0x%x"), t, xtimer.days);
         }        
       }
     }
