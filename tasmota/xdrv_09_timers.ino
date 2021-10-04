@@ -511,9 +511,13 @@ void CmndShuffleWeekDays(void)
       d[n++] = i;
     }
   }
+  if (n<2) {
+    Response_P(PSTR("{\"" D_CMND_SHUFFLEWEEEKDAYS "\":\"NEED AT LEAST 2 DAYS\"}"));
+    return;
+  }
 
   for (uint8_t i=n-1;i;i--) { // Durstenfeld shuffle algorithm
-    uint8_t j=random(0,i);
+    uint8_t j=random(0,i+1);
     DEBUG_DRIVER_LOG(PSTR("CmndShuffleWeekDays: i=%d j=%d"), i, j);
     if (i != j) {
       DEBUG_DRIVER_LOG(PSTR("CmndShuffleWeekDays: swapping day %d with %d"), d[i], d[j]);
