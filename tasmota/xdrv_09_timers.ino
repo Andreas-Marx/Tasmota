@@ -521,8 +521,8 @@ void CmndShuffleWeekDays(void)
     DEBUG_DRIVER_LOG(PSTR("CmndShuffleWeekDays: i=%d j=%d"), i, j);
     if (i != j) {
       DEBUG_DRIVER_LOG(PSTR("CmndShuffleWeekDays: swapping day %d with %d"), d[i], d[j]);
-      uint8_t day_a  = (1<<d[i]), p_day_a = (1<<((d[i]+6)%7);
-      uint8_t day_b  = (1<<d[j]), p_day_b = (1<<((d[i]+6)%7);
+      uint8_t day_a  = (1<<d[i]), p_day_a = (1<<((d[i]+6)%7));
+      uint8_t day_b  = (1<<d[j]), p_day_b = (1<<((d[i]+6)%7));
       uint8_t keep   = 0x7F -   day_a -   day_b,
               p_keep = 0x7F - p_day_a - p_day_b;
       for (uint32_t t = 0; t < MAX_TIMERS; t++) { // apply swap to all selected timers
