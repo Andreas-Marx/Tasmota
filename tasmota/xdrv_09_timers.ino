@@ -886,7 +886,7 @@ const char HTTP_FORM_TIMER3[] PROGMEM =
   "<label><input id='b0' name='rd' type='radio' value='0' onclick='gt();'><b>" D_TIMER_TIME "</b></label><br>"
   "<label><input id='b1' name='rd' type='radio' value='1' onclick='gt();'><b>" D_SUNRISE "</b> (%s)</label><br>"
   "<label><input id='b2' name='rd' type='radio' value='2' onclick='gt();'><b>" D_SUNSET "</b> (%s)</label><br>"
-  "<label><input id='b3' name='rd' type='radio' value='3' onclick='gt();'><b>" D_PREVIOUS "</b> (%s)</label><br>"
+  "<label><input id='b3' name='rd' type='radio' value='3' onclick='gt();'><b>" D_PREVIOUS "</b></label><br>"
   "</fieldset>"
   "<p></p>"
   "<span><select style='width:46px;' id='dr'></select></span>"
