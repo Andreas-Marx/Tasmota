@@ -517,8 +517,7 @@ void CmndShuffleWeekDays(void)
     return;
   }
 
-  if (*cptr) cptr++; // skip over blank
-  ch = *cptr++;
+  if (*cptr) ch = *cptr++; // skip over blank
 
   for (uint8_t i=0; ch!='\0' && ch!=' ' && i<MAX_TIMERS; i++ ) {
     DEBUG_DRIVER_LOG(PSTR("CmndShuffleWeekDays: timerloop %d processing %c"), i, ch);
@@ -536,7 +535,7 @@ void CmndShuffleWeekDays(void)
 
   for (uint8_t i=n-1;i;i--) { // Durstenfeld shuffle algorithm
     uint8_t j=random(0,i+1);
-    DEBUG_DRIVER_LOG(PSTR("CmndShuffleWeekDays: i=%d j=%d"), i, j);
+    DEBUG_DRIVER_LOG(PSTR("CmndShuffleWeekDays: thrown dice i=%d j=%d"), i, j);
     if (i != j) {
       DEBUG_DRIVER_LOG(PSTR("CmndShuffleWeekDays: swapping day %d with %d"), d[i], d[j]);
       uint8_t day_a  = (1<<d[i]), p_day_a = (1<<((d[i]+6)%7));
@@ -545,7 +544,7 @@ void CmndShuffleWeekDays(void)
               p_keep = 0x7F - p_day_a - p_day_b;
       for (uint32_t t = 0; t < MAX_TIMERS; t++) { // apply swap to all selected timers
         if (timermask & (1<<t)) {
-          DEBUG_DRIVER_LOG(PSTR("CmndShuffleWeekDays: timer[%d].days was        0x%x"), t, Settings->timer[t].days);
+          uint8_t oldstate = Settings->timer[t].days;
           if (Settings->timer[t].mode == 3) {
             Settings->timer[t].days = ((Settings->timer[t].days) & p_keep               )
                                     | ((Settings->timer[t].days) & p_day_a ? p_day_b : 0)
@@ -555,7 +554,7 @@ void CmndShuffleWeekDays(void)
                                     | ((Settings->timer[t].days) &   day_a ?   day_b : 0)
                                     | ((Settings->timer[t].days) &   day_b ?   day_a : 0);
           }
-          DEBUG_DRIVER_LOG(PSTR("CmndShuffleWeekDays: timer[%d].days changed to 0x%x"), t, Settings->timer[t].days);
+          DEBUG_DRIVER_LOG(PSTR("CmndShuffleWeekDays: timer[%d].days from 0x%02x to 0x%02x"), t, oldstate, Settings->timer[t].days);
         }        
       }
     }
