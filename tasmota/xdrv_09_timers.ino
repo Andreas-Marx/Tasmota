@@ -497,7 +497,7 @@ void CmndShuffleWeekDays(void)
 {
   char *cptr = XdrvMailbox.data;
 
-  uint32_t timermask; // bitmask of timers to shuffle
+  uint32_t timermask = 0; // bitmask of timers to shuffle
 
   uint8_t n = 0; // number of weekdays to shuffle
   uint8_t d[7];  // weekday indexing array
