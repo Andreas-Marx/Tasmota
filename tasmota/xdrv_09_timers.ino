@@ -495,24 +495,42 @@ void CmndTimers(void)
 
 void CmndShuffleWeekDays(void) 
 {
+  char *cptr = XdrvMailbox.data;
+
   uint32_t timermask; // bitmask of timers to shuffle
-  uint8_t  daymask;   // bitmask of weekdays to shuffle
 
-  // TODO: parameter parsing
-  timermask = 0xF;  // shuffle timers 1-4
-  daymask   = 0x35; // shuffle Su, Tu, Th, Fr
-
-  uint8_t d[7];  // weekday indexing array
   uint8_t n = 0; // number of weekdays to shuffle
+  uint8_t d[7];  // weekday indexing array
 
-  for (uint8_t i=0;i<7;i++) {
-    if (daymask & (1<<i)) {
+  char ch = *cptr++;
+  for (uint8_t i=0 ; ch!='\0' && ch!=' ' && i<7; i++ ) {
+    DEBUG_DRIVER_LOG(PSTR("CmndShuffleWeekDays: dayloop %d processing %c"), i, ch);
+    if (ch!='-' && ch != '0') {
       DEBUG_DRIVER_LOG(PSTR("CmndShuffleWeekDays: d[%d] = %d"), n, i);
       d[n++] = i;
     }
+    ch = *cptr++;
   }
+
   if (n<2) {
     Response_P(PSTR("{\"" D_CMND_SHUFFLEWEEEKDAYS "\":\"NEED AT LEAST 2 DAYS\"}"));
+    return;
+  }
+
+  if (*cptr) cptr++; // skip over blank
+  ch = *cptr++;
+
+  for (uint8_t i=0; ch!='\0' && ch!=' ' && i<MAX_TIMERS; i++ ) {
+    DEBUG_DRIVER_LOG(PSTR("CmndShuffleWeekDays: timerloop %d processing %c"), i, ch);
+    if (ch!='-') {
+      timermask |= 1<<i;
+      DEBUG_DRIVER_LOG(PSTR("CmndShuffleWeekDays: timermask %02x"), timermask);
+    }
+    ch = *cptr++;
+  }
+
+  if (! timermask) {
+    Response_P(PSTR("{\"" D_CMND_SHUFFLEWEEEKDAYS "\":\"NEED AT LEAST 1 TIMER\"}"));
     return;
   }
 
