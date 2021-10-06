@@ -40,6 +40,7 @@
 
 const char kTimerCommands[] PROGMEM = "|"  // No prefix
   D_CMND_TIMER "|" D_CMND_TIMERS
+  "|" D_CMND_SHUFFLEWEEEKDAYS
 #ifdef USE_SUNRISE
   "|" D_CMND_LATITUDE "|" D_CMND_LONGITUDE
 #endif
@@ -47,6 +48,7 @@ const char kTimerCommands[] PROGMEM = "|"  // No prefix
 
 void (* const TimerCommand[])(void) PROGMEM = {
   &CmndTimer, &CmndTimers
+, &CmndShuffleWeekDays
 #ifdef USE_SUNRISE
   , &CmndLatitude, &CmndLongitude
 #endif
@@ -491,6 +493,90 @@ void CmndTimers(void)
 #endif
 }
 
+void CmndShuffleWeekDays(void) 
+{
+  char *cptr = XdrvMailbox.data;
+
+  uint32_t timermask = 0; // bitmask of timers to shuffle
+
+  uint8_t n = 0; // number of weekdays to shuffle
+  uint8_t d[7];  // weekday indexing array
+
+  char ch = *cptr++;
+  for (uint8_t i=0 ; ch!='\0' && ch!=' ' && i<7; i++ ) {
+    DEBUG_DRIVER_LOG(PSTR("CmndShuffleWeekDays: dayloop %d processing %c"), i, ch);
+    if (ch!='-' && ch != '0') {
+      DEBUG_DRIVER_LOG(PSTR("CmndShuffleWeekDays: d[%d] = %d"), n, i);
+      d[n++] = i;
+    }
+    ch = *cptr++;
+  }
+
+  if (n<2) {
+    Response_P(PSTR("{\"" D_CMND_SHUFFLEWEEEKDAYS "\":\"NEED AT LEAST 2 DAYS\"}"));
+    return;
+  }
+
+  if (*cptr) ch = *cptr++; // skip over blank
+
+  for (uint8_t i=0; ch!='\0' && ch!=' ' && i<MAX_TIMERS; i++ ) {
+    DEBUG_DRIVER_LOG(PSTR("CmndShuffleWeekDays: timerloop %d processing %c"), i, ch);
+    if (ch!='-') {
+      timermask |= 1<<i;
+      DEBUG_DRIVER_LOG(PSTR("CmndShuffleWeekDays: timermask %02x"), timermask);
+    }
+    ch = *cptr++;
+  }
+
+  if (! timermask) {
+    Response_P(PSTR("{\"" D_CMND_SHUFFLEWEEEKDAYS "\":\"NEED AT LEAST 1 TIMER\"}"));
+    return;
+  }
+
+#define DMASK(x) ((x)&0x01 ? 'S' : '-') \
+                ,((x)&0x02 ? 'M' : '-') \
+                ,((x)&0x04 ? 'T' : '-') \
+                ,((x)&0x08 ? 'W' : '-') \
+                ,((x)&0x10 ? 'T' : '-') \
+                ,((x)&0x20 ? 'F' : '-') \
+                ,((x)&0x40 ? 'S' : '-')
+
+  for (uint8_t i=n-1;i;i--) { // Durstenfeld shuffle algorithm
+    uint8_t j=random(0,i+1);
+    DEBUG_DRIVER_LOG(PSTR("CmndShuffleWeekDays: thrown dice i=%d j=%d"), i, j);
+    if (i != j) {
+      DEBUG_DRIVER_LOG(PSTR("CmndShuffleWeekDays: swapping day %d with %d"), d[i], d[j]);
+      uint8_t day_a  = (1<<d[i]), p_day_a = (1<<((d[i]+6)%7));
+      uint8_t day_b  = (1<<d[j]), p_day_b = (1<<((d[j]+6)%7));
+      uint8_t keep   = 0x7F -   day_a -   day_b,
+              p_keep = 0x7F - p_day_a - p_day_b;
+      DEBUG_DRIVER_LOG(PSTR("CmndShuffleWeekDays:   day_a = %c%c%c%c%c%c%c"), DMASK(  day_a));
+      DEBUG_DRIVER_LOG(PSTR("CmndShuffleWeekDays: p_day_a = %c%c%c%c%c%c%c"), DMASK(p_day_a));
+      DEBUG_DRIVER_LOG(PSTR("CmndShuffleWeekDays:   day_b = %c%c%c%c%c%c%c"), DMASK(  day_b));
+      DEBUG_DRIVER_LOG(PSTR("CmndShuffleWeekDays: p_day_b = %c%c%c%c%c%c%c"), DMASK(p_day_b));
+      DEBUG_DRIVER_LOG(PSTR("CmndShuffleWeekDays:   keep  = %c%c%c%c%c%c%c"), DMASK(  keep ));
+      DEBUG_DRIVER_LOG(PSTR("CmndShuffleWeekDays: p_keep  = %c%c%c%c%c%c%c"), DMASK(p_keep ));
+      for (uint32_t t = 0; t < MAX_TIMERS; t++) { // apply swap to all selected timers
+        if (timermask & (1<<t)) {
+          DEBUG_DRIVER_LOG(PSTR("CmndShuffleWeekDays: timer[%02d] %c%c%c%c%c%c%c"), t, DMASK(Settings->timer[t].days));
+          if (Settings->timer[t].mode == 3) {
+            Settings->timer[t].days = ((Settings->timer[t].days) & p_keep               )
+                                    | ((Settings->timer[t].days) & p_day_a ? p_day_b : 0)
+                                    | ((Settings->timer[t].days) & p_day_b ? p_day_a : 0);
+            DEBUG_DRIVER_LOG(PSTR("CmndShuffleWeekDays: timer[%02d] %c%c%c%c%c%c%c (p)"), t, DMASK(Settings->timer[t].days));
+          } else {
+            Settings->timer[t].days = ((Settings->timer[t].days) &   keep               )
+                                    | ((Settings->timer[t].days) &   day_a ?   day_b : 0)
+                                    | ((Settings->timer[t].days) &   day_b ?   day_a : 0);
+            DEBUG_DRIVER_LOG(PSTR("CmndShuffleWeekDays: timer[%02d] %c%c%c%c%c%c%c (t)"), t, DMASK(Settings->timer[t].days));
+          }
+        }        
+      }
+    }
+  }
+  Response_P(PSTR("{\"" D_CMND_SHUFFLEWEEEKDAYS "\":\"OK\"}"));
+}
+
 #ifdef USE_SUNRISE
 void CmndLongitude(void)
 {
@@ -541,27 +627,27 @@ const char HTTP_TIMER_SCRIPT1[] PROGMEM =
 
 #ifdef USE_SUNRISE
 #ifdef USE_UNISHOX_COMPRESSION
-const size_t HTTP_TIMER_SCRIPT2_SIZE = 630;
+const size_t HTTP_TIMER_SCRIPT2_SIZE = 640;
 const char HTTP_TIMER_SCRIPT2_COMPRESSED[] PROGMEM = "\x30\x2F\x83\xAD\xCE\x43\xD4\x77\x4E\xF1\xED\x33\xBF\xA1\xA7\x50\xC3\xA8\xD4\x78"
                              "\x1A\x7C\x35\x78\xEE\x9F\x7B\xC3\x05\xD1\xEF\x75\x8D\x67\xC3\xD9\xF1\x0F\x61\xEF"
                              "\x9E\x61\x8A\x61\x9A\x31\x0F\xB3\xBC\x74\x33\xB0\x85\xB3\xC0\xC3\xE0\xCA\x3D\xE0"
-                             "\xE8\xF7\xCF\xD1\xC6\x46\xC3\x9E\x22\x30\x46\x0F\x1A\x60\xEE\x8D\x3E\x1F\x0E\x33"
-                             "\xBC\x7B\x4B\xD8\x77\x4E\x33\xBC\x78\x23\x51\xF0\x86\xDD\x0A\x3A\x18\x0B\x33\xE7"
-                             "\x74\x61\xD8\x73\x99\xDE\x3C\x16\x98\x3B\xA6\xA3\xD0\xE4\x67\x78\xF6\x91\xA8\xF8"
-                             "\x7D\x9C\x67\xD9\xDB\x23\x51\xE0\xF7\x1A\xBC\x77\x4F\xB3\xC8\x56\x02\x1E\x5E\x7C"
-                             "\x35\x1E\x0D\x47\xC1\x87\xD1\xF4\x73\x99\x02\x9E\x10\x37\x41\x1B\x08\x3D\xDA\x60"
-                             "\xEE\x9D\xD1\xA7\xC3\xE1\xC8\x77\x8F\xF1\xFE\x3B\xA4\x34\xF8\x7C\x39\x47\x78\xEF"
-                             "\x1E\xD2\xF6\x1D\xD3\x90\x81\x53\x59\x3F\x0F\x87\x25\x1D\xE3\xDA\x46\xA3\xAC\xF8"
-                             "\x72\x51\xE0\x8D\x5E\x3B\xA7\xD9\xE4\x27\xCF\xB3\xBC\x74\xF3\x09\x87\x4C\x42\xDE"
-                             "\x11\x9B\x0F\x87\x21\xE0\xF7\x13\x0B\xCC\xF6\x82\x9D\xC3\x8C\xF0\x7B\x88\x19\x67"
-                             "\x04\x87\xB8\x11\x38\xE6\xF6\x1D\xD1\xC7\x78\xF6\xE1\xF0\x11\x32\xD3\xC3\x3E\x61"
-                             "\xD0\x31\x5A\x10\x84\xC2\x63\x5F\x51\x07\x82\xFA\x8F\x1A\x60\xEE\x8E\x3E\x1F\x0E"
-                             "\x43\xBC\x40\x8F\xC0\x1D\x19\x04\xCE\x86\x7B\xED\x1D\xA1\x6D\x19\x1F\x0F\xB3\xEC"
-                             "\xF1\xA6\x0E\xEB\x3F\x0E\x4A\x3B\xC7\xB4\x8C\x67\xCE\xEE\x9F\x0E\x4A\x3C\x16\x9E"
-                             "\x87\xC3\x95\x67\x82\xD3\xB6\x76\xCE\xF1\xED\xC3\xA7\xD8\xDC\x33\x64\x18\xAD\x08"
-                             "\x43\xBB\x87\x40\xAF\xD4\x08\x7A\x08\xAD\x08\x43\xBC\x78\x3D\xC7\xB8\x13\x38\x68"
-                             "\x04\xCD\x04\x56\x88\x23\xE0\x41\xD1\xCF\x43\x95\x64\x0A\x3A\x38\x6C\xEE\xE9\xD5"
-                             "\x87\x78\xF0\x7B\x8F\x71\xEE\x3D\xC6";
+                             "\xE8\xF7\xCF\xD1\xC6\x46\xC3\x9E\x22\x30\x46\x0F\x1A\x60\xEE\x9D\xD1\xA7\xC3\xE1"
+                             "\xC6\x77\x8F\xF1\xFE\x3B\xA4\x34\xF8\x7C\x39\x67\x78\xEF\x1E\xD2\xF6\x1D\xD3\x8C"
+                             "\xEF\x1E\x08\xD4\x7C\x21\xB7\x42\x8E\x86\x02\xCC\xF9\xDD\x18\x76\x1C\xE6\x77\x8F"
+                             "\x05\xA6\x0E\xE9\xA8\xF4\x39\x19\xDE\x3D\xA4\x6A\x3E\x1F\x67\x19\xF6\x76\xC8\xD4"
+                             "\x78\x3D\xC6\xAF\x1D\xD3\xEC\xF2\x15\x80\x87\x9C\x9F\x0D\x47\x83\x51\xF0\x61\xF4"
+                             "\x7D\x1C\xE6\x40\xA7\x84\x0D\xD0\x46\xC2\x0F\x70\x21\x6B\x27\x21\x02\x16\xB2\x72"
+                             "\x88\x10\x75\x93\x90\x81\x53\x59\x3F\x0F\x87\x25\x1D\xE3\xDA\x46\xA3\xAC\xF8\x72"
+                             "\x51\xE0\x8D\x5E\x3B\xA7\xD9\xE4\x27\xCF\xB3\xBC\x74\xF3\x09\x87\x4C\x42\xDE\x11"
+                             "\x9B\x0F\x87\x21\xE0\xF7\x13\x0B\xCC\xF6\x82\x9D\xC3\x8C\xF0\x7B\x88\x19\x67\x04"
+                             "\x87\xB8\x11\x38\xF0\xF6\x1D\xD1\xC7\x78\xF6\xE1\xF0\x11\x32\xD3\xC3\x3E\x61\xD0"
+                             "\x31\x5A\x10\x84\xC2\x63\x5F\x51\x07\x82\xFA\x8F\x1A\x60\xEE\x8E\x3E\x1F\x0E\x43"
+                             "\xBC\x40\x8F\xC0\x1D\x19\x04\xCE\x86\x7B\xED\x1D\xA1\x6D\x19\x1F\x0F\xB3\xEC\xF1"
+                             "\xA6\x0E\xEB\x3F\x0E\x4A\x3B\xC7\xB4\x8C\x67\xCE\xEE\x9F\x0E\x4A\x3C\x16\x9E\x87"
+                             "\xC3\x95\x67\x82\xD3\xB6\x76\xCE\xF1\xED\xC3\xA7\xD8\xDC\x33\x64\x18\xAD\x08\x43"
+                             "\xBB\x87\x40\xAF\xD4\x08\x7A\x08\xAD\x08\x43\xBC\x78\x3D\xC7\xB8\x13\x38\x68\x04"
+                             "\xCD\x04\x56\x88\x23\xE0\x41\xD1\xCF\x43\x95\x64\x0A\x3A\x38\x6C\xEE\xE9\xD5\x87"
+                             "\x78\xF0\x7B\x8F\x71\xEE\x3D\xC6";
 #define  HTTP_TIMER_SCRIPT2       Decompress(HTTP_TIMER_SCRIPT2_COMPRESSED,HTTP_TIMER_SCRIPT2_SIZE).c_str()
 #else
 const char HTTP_TIMER_SCRIPT2[] PROGMEM =
@@ -569,7 +655,7 @@ const char HTTP_TIMER_SCRIPT2[] PROGMEM =
     "var m,p,q;"
     "m=qs('input[name=\"rd\"]:checked').value;"                   // Get mode
     "p=pt[ct]&0x7FF;"                                             // Get time
-    "if(m==0){"                                                   // Time is set
+    "if((m==0)||(m==3)){"                                             // Time is set
       "so(0);"                                                    // Hide offset span and allow Hour 00..23
       "q=Math.floor(p/60);if(q<10){q='0'+q;}qs('#ho').value=q;"   // Set hours
       "q=p%%60;if(q<10){q='0'+q;}qs('#mi').value=q;"               // Set minutes
@@ -599,7 +685,7 @@ const char HTTP_TIMER_SCRIPT2[] PROGMEM =
 
 #ifdef USE_UNISHOX_COMPRESSION
 #ifdef USE_SUNRISE
-const size_t HTTP_TIMER_SCRIPT3_SIZE = 587;
+const size_t HTTP_TIMER_SCRIPT3_SIZE = 597;
 const char HTTP_TIMER_SCRIPT3_COMPRESSED[] PROGMEM = "\x30\x2F\x83\xAD\xCE\x5E\xA3\xBA\x77\x8F\x69\x9D\xFD\x69\xD4\x11\xD4\x34\xEA\xE3"
                              "\xA8\x61\xD5\xE3\xC0\xD3\xE1\xC6\x78\x2F\x1F\x0E\x33\xC1\x71\xF0\xE4\x3D\x0F\x4B"
                              "\x87\x82\xD3\x07\x75\x8E\x3B\xA7\xDD\x9C\x67\xD9\xDE\x3A\x10\x62\x98\x66\x8C\x43"
@@ -614,16 +700,17 @@ const char HTTP_TIMER_SCRIPT3_COMPRESSED[] PROGMEM = "\x30\x2F\x83\xAD\xCE\x5E\x
                              "\xCA\xB3\xBC\x78\x3D\xC4\x08\x7A\x11\xE4\x30\x13\x30\xD3\xD0\xF4\x39\x5E\x3B\xC7"
                              "\x83\xDC\x4C\x2F\x33\xDB\xE3\xFC\x7C\x39\x67\xA1\xE9\x5E\x3C\x1E\xE2\x08\xF8\x77"
                              "\x41\x07\x0D\x15\x80\x97\x86\x9E\xB3\x9C\xCE\xF1\xDB\x23\x57\x8E\xE9\xF6\x79\x0D"
-                             "\xD0\x4B\xB0\x77\x8F\xD1\xC6\x46\xC3\x9E\x22\x30\x46\x0F\x1A\x60\xEE\x8D\x3E\x02"
-                             "\x16\xC2\x11\xE0\xF7\x69\x83\xBA\x77\x46\x9F\x0F\x87\x21\xDE\x3F\xC7\xF8\xEE\x90"
-                             "\xD3\xE1\xF0\xE5\x1D\xE3\xBC\x7B\x4B\x4C\x02\x0E\x78\x27\xC1\x2F\x20\x3F\x0E\x33"
-                             "\xBC\x7B\x4B\x4C\x1D\xD0\x8F\xC3\x8C\xEF\x1E\xD2\x08\xED\x9F\x0E\x7A\x99\xE0\xF7"
-                             "\x1E\xE2\xF1\xFE\x3E\x04\x08\x59\xC1\xEE\xF1\xFE\x04\x3D\xE4\x68\xF8\x27\xEB\xA7"
-                             "\x19\x11\x83\xBC\x7A\x1E\x87\x24\x3C\x10\xCA\x3D\xE0\xE8\xF7\xCF\x9E\x3C\x31\xC7"
-                             "\x74\xFB\xA3\x8C\x81\x0F\x8A\x63\xE0\xCA\x3A\x1A\xF3\x78\xEE\x9D\xE3\xC1\xEE";
+                             "\xD0\x4B\xB0\x77\x8F\xD1\xC6\x46\xC3\x9E\x22\x30\x46\x0F\x1A\x60\xEE\x9D\xD1\xA7"
+                             "\xC3\xE1\xC6\x77\x8F\xF1\xFE\x3B\xA4\x34\xF8\x7C\x39\x67\x78\xEF\x1E\xD2\xF1\xFE"
+                             "\x3E\x04\x78\x3D\xC0\x85\x54\xE4\x20\x42\xAA\x72\x8E\xF1\xDE\x3D\xA5\xA6\x01\x07"
+                             "\x46\x13\xE0\x97\x95\x1F\x87\x19\xDE\x3D\xA5\xA6\x0E\xE8\x47\xE1\xC6\x77\x8F\x69"
+                             "\x04\x76\xCF\x87\x3D\x4C\xF0\x7B\x8F\x71\x78\xFF\x1F\x02\x04\x2D\x08\xF7\x78\xFF"
+                             "\x02\x1F\x2A\x01\x63\x47\xC1\x3F\x67\x38\xC8\x8C\x1D\xE3\xD0\xF4\x39\x21\xE0\x86"
+                             "\x51\xEF\x07\x47\xBE\x7C\xF1\xE1\x8E\x3B\xA7\xDD\x1C\x64\x08\x7C\x58\x1F\x06\x51"
+                             "\xD0\xD7\x9B\xC7\x74\xEF\x1E\x0F\x71";
 #define  HTTP_TIMER_SCRIPT3       Decompress(HTTP_TIMER_SCRIPT3_COMPRESSED,HTTP_TIMER_SCRIPT3_SIZE).c_str()
 #else
-const size_t HTTP_TIMER_SCRIPT3_SIZE = 424;
+const size_t HTTP_TIMER_SCRIPT3_SIZE = 434;
 const char HTTP_TIMER_SCRIPT3_COMPRESSED[] PROGMEM = "\x30\x2F\x83\xAD\xCE\x5E\xA3\xBA\x77\x8F\x69\x9D\xFD\x69\xD4\x11\xD4\x34\xEA\xE3"
                              "\xA8\x61\xD5\xE3\xC0\xD3\xE1\xC6\x78\x2F\x1F\x0E\x33\xC1\x71\xF0\xE4\x3D\x0F\x4B"
                              "\x87\x82\xD3\x07\x75\x8E\x3B\xA7\xDD\x9C\x67\xD9\xDE\x3A\x10\x62\x98\x66\x8C\x43"
@@ -636,10 +723,11 @@ const char HTTP_TIMER_SCRIPT3_COMPRESSED[] PROGMEM = "\x30\x2F\x83\xAD\xCE\x5E\x
                              "\xFC\x7C\x3B\xA6\xAF\x1D\xD3\xEC\xF2\x18\x09\x98\x69\xE8\x7A\x1C\xAF\x1D\xE3\xC1"
                              "\xEE\x26\x17\x99\xED\xF1\xFE\x3E\x1C\xB3\xD0\xF4\xAF\x1E\x0F\x71\x04\x7C\x3B\xA0"
                              "\x83\x86\x8A\xC0\x4B\xC3\x4F\x59\xCE\x67\x78\xED\x91\xAB\xC7\x74\xFB\x3C\x86\xE8"
-                             "\x25\xD8\x3B\xC7\xE8\xE3\x23\x61\xCF\x11\x18\x23\x07\x8D\x30\x77\x46\x9F\x01\x0B"
-                             "\x61\x08\x10\x75\xB0\x41\xCA\xC6\x8F\x82\x7E\x1E\x71\x91\x18\x3B\xC7\xA1\xE8\x72"
-                             "\x43\xC1\x0C\xA3\xDE\x0E\x8F\x7C\xF9\xE3\xC3\x1C\x77\x4F\xBA\x38\xCF\xB3\xBC\x74"
-                             "\x23\x3B\x08\x5B\x3E\x0C\xA3\xA1\xAF\x37\x8E\xE9\xDE\x3C\x1E\xE3";
+                             "\x25\xD8\x3B\xC7\xE8\xE3\x23\x61\xCF\x11\x18\x23\x07\x8D\x30\x77\x4E\xE8\xD3\xE1"
+                             "\xF0\xE3\x3B\xC7\xF8\xFF\x1D\xD2\x1A\x7C\x3E\x1C\xB3\xBC\x77\x8F\x69\x78\xFF\x1F"
+                             "\x02\x04\x1D\x94\x10\x73\x51\xA3\xE0\x9F\x8C\x9C\x64\x46\x0E\xF1\xE8\x7A\x1C\x90"
+                             "\xF0\x43\x28\xF7\x83\xA3\xDF\x3E\x78\xF0\xC7\x1D\xD3\xEE\x8E\x33\xEC\xEF\x1D\x08"
+                             "\xCE\xC2\x16\xCF\x83\x28\xE8\x6B\xCD\xE3\xBA\x77\x8F\x07\xB8";
 #define  HTTP_TIMER_SCRIPT3       Decompress(HTTP_TIMER_SCRIPT3_COMPRESSED,HTTP_TIMER_SCRIPT3_SIZE).c_str()
 #endif //USE_SUNRISE
 #else
@@ -661,7 +749,7 @@ const char HTTP_TIMER_SCRIPT3[] PROGMEM =
       "s|=3<<27;"                                                 // Get action (rule)
     "}"
     "l=((qs('#ho').selectedIndex*60)+qs('#mi').selectedIndex)&0x7FF;"
-    "if(m==0){s|=l;}"                                             // Get time
+    "if((m==0)||(m==3)){s|=l;}"                                   // Get time
 #ifdef USE_SUNRISE
     "if((m==1)||(m==2)){"
       "if(qs('#dr').selectedIndex>0){if(l>0){l+=720;}}"           // If negative offset and delta-time > 0, add 12h to given offset time
@@ -814,6 +902,7 @@ const char HTTP_FORM_TIMER3[] PROGMEM =
   "<label><input id='b0' name='rd' type='radio' value='0' onclick='gt();'><b>" D_TIMER_TIME "</b></label><br>"
   "<label><input id='b1' name='rd' type='radio' value='1' onclick='gt();'><b>" D_SUNRISE "</b> (%s)</label><br>"
   "<label><input id='b2' name='rd' type='radio' value='2' onclick='gt();'><b>" D_SUNSET "</b> (%s)</label><br>"
+  "<label><input id='b3' name='rd' type='radio' value='3' onclick='gt();'><b>" D_PREVIOUS "</b></label><br>"
   "</fieldset>"
   "<p></p>"
   "<span><select style='width:46px;' id='dr'></select></span>"

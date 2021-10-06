@@ -550,6 +550,7 @@
 #define D_CMND_TIMERS "Timers"
 #define D_CMND_LATITUDE "Latitude"
 #define D_CMND_LONGITUDE "Longitude"
+#define D_CMND_SHUFFLEWEEEKDAYS "ShuffleWeekDays"
 
 // Commands xdrv_23_zigbee.ino
 #define D_PRFX_ZB "Zb"
