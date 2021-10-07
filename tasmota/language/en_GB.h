@@ -169,7 +169,7 @@
 #define D_SUCCESSFUL "Successful"
 #define D_SUNRISE "Sunrise"
 #define D_SUNSET "Sunset"
-#define D_PREVIOUS "previous"
+#define D_PREVIOUS "stick to previous day"
 #define D_TEMPERATURE "Temperature"
 #define D_TO "to"
 #define D_TOGGLE "Toggle"

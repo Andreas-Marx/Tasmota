@@ -546,8 +546,8 @@ void CmndShuffleWeekDays(void)
     DEBUG_DRIVER_LOG(PSTR("CmndShuffleWeekDays: thrown dice i=%d j=%d"), i, j);
     if (i != j) {
       DEBUG_DRIVER_LOG(PSTR("CmndShuffleWeekDays: swapping day %d with %d"), d[i], d[j]);
-      uint8_t day_a  = (1<<d[i]), p_day_a = (1<<((d[i]+6)%7));
-      uint8_t day_b  = (1<<d[j]), p_day_b = (1<<((d[j]+6)%7));
+      uint8_t day_a  = (1<<d[i]), p_day_a = (1<<((d[i]+1)%7));
+      uint8_t day_b  = (1<<d[j]), p_day_b = (1<<((d[j]+1)%7));
       uint8_t keep   = 0x7F -   day_a -   day_b,
               p_keep = 0x7F - p_day_a - p_day_b;
       DEBUG_DRIVER_LOG(PSTR("CmndShuffleWeekDays:   day_a = %c%c%c%c%c%c%c"), DMASK(  day_a));
@@ -960,7 +960,7 @@ void HandleTimerConfiguration(void)
   }
   WSContentSend_P(HTTP_FORM_TIMER2);
 #ifdef USE_SUNRISE
-  WSContentSend_P(HTTP_FORM_TIMER3, 100 + (strlen(D_SUNSET) *12), GetSun(0).c_str(), GetSun(1).c_str());
+  WSContentSend_P(HTTP_FORM_TIMER3, 100 + (strlen(D_PREVIOUS) *8), GetSun(0).c_str(), GetSun(1).c_str());
 #else
   WSContentSend_P(HTTP_FORM_TIMER3);
 #endif  // USE_SUNRISE
